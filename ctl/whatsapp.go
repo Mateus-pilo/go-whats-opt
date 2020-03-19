@@ -12,6 +12,7 @@ import (
 	"github.com/Mateus-pilo/go-whats-opt/hlp/router"
 )
 
+
 type reqWhatsAppLogin struct {
 	Output  string `json:"output"`
 	Timeout int    `json:"timeout"`
@@ -160,6 +161,8 @@ func WhatsAppSendText(w http.ResponseWriter, r *http.Request) {
 }
 
 func WhatsAppSendContent(w http.ResponseWriter, r *http.Request, t string) {
+	var resBody resWhatsAppSendMessage
+	
 	jid, err := auth.GetJWTClaims(r.Header.Get("X-JWT-Claims"))
 	if err != nil {
 		router.ResponseInternalError(w, err.Error())
@@ -188,29 +191,49 @@ func WhatsAppSendContent(w http.ResponseWriter, r *http.Request, t string) {
 		}
 	}
 
-	mpFileStream, mpFileHeader, err := r.FormFile("image")
-	if err != nil {
-		router.ResponseBadRequest(w, err.Error())
-		return
+	if t == "image" {
+		mpFileStream, mpFileHeader, err := r.FormFile("image")
+		if err != nil {
+			router.ResponseBadRequest(w, err.Error())
+			return
+		}
+		defer mpFileStream.Close()
+
+		mpFileType := mpFileHeader.Header.Get("Content-Type")
+
+		if len(reqBody.MSISDN) == 0 {
+			router.ResponseBadRequest(w, "")
+			return
+		}
+
+		id, err := libs.WAMessageImage(jid, reqBody.MSISDN, mpFileStream, mpFileType, reqBody.Message, reqBody.Delay)
+		if err != nil {
+			router.ResponseInternalError(w, err.Error())
+			return
+		}
+		resBody.MessageID = id
+	} else {
+		mpFileStream, mpFileHeader, err := r.FormFile("document")
+		if err != nil {
+			router.ResponseBadRequest(w, err.Error())
+			return
+		}
+		defer mpFileStream.Close()
+
+		mpFileType := mpFileHeader.Header.Get("Content-Type")
+
+		if len(reqBody.MSISDN) == 0 {
+			router.ResponseBadRequest(w, "")
+			return
+		}
+
+		id, err := libs.WAMessageDocument(jid, reqBody.MSISDN, mpFileStream, mpFileType, reqBody.Message, reqBody.Delay)
+		if err != nil {
+			router.ResponseInternalError(w, err.Error())
+			return
+		}
+		resBody.MessageID = id
 	}
-	defer mpFileStream.Close()
-
-	mpFileType := mpFileHeader.Header.Get("Content-Type")
-
-	if len(reqBody.MSISDN) == 0 || len(reqBody.Message) == 0 {
-		router.ResponseBadRequest(w, "")
-		return
-	}
-
-	id, err := libs.WAMessageImage(jid, reqBody.MSISDN, mpFileStream, mpFileType, reqBody.Message, reqBody.Delay)
-	if err != nil {
-		router.ResponseInternalError(w, err.Error())
-		return
-	}
-
-	var resBody resWhatsAppSendMessage
-	resBody.MessageID = id
-
 	router.ResponseSuccessWithData(w, "", resBody)
 }
 
