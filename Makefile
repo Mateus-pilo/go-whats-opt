@@ -11,18 +11,18 @@ COMMIT_MSG         := "update improvement"
 
 init:
 	make clean
-	dep init -v
+	go mod init
 
 init-dist:
 	mkdir -p dist
 	touch dist/.gitkeep
 
-ensure:
+vendor:
 	make clean
-	dep ensure -v
+	go mod vendor
 
 release:
-	make ensure
+	make vendor
 	goreleaser --snapshot --skip-publish --rm-dist
 	make init-dist
 	echo "Release complete please check dist directory."
@@ -44,14 +44,14 @@ clean:
 	rm -rf ./vendor
 
 commit:
-	make ensure
+	make vendor
 	make clean
 	git add .
 	git commit -am "$(COMMIT_MSG)"
 
 rebase:
 	rm -rf .git
-	find . -type f -iname "*.go*" -exec sed -i '' -e "s%github.com/Mateus-pilo/go-whats-opt%$(REBASE_URL)%g" {} \;
+	find . -type f -iname "*.go*" -exec sed -i '' -e "s%github.com/dimaskiddo/codebase-go-rest-lite%$(REBASE_URL)%g" {} \;
 	git init
 	git remote add origin https://$(REBASE_URL).git
 

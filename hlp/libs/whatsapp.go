@@ -29,6 +29,7 @@ var wac = make(map[string]*whatsapp.Conn)
 
 type waHandler struct{
 	c *whatsapp.Conn
+	jid string
 }
 
 
@@ -75,10 +76,9 @@ func (h *waHandler) HandleError(err error) {
 }
 
 
-func (*waHandler) HandleTextMessage(message whatsapp.TextMessage) {
-	
+func (w *waHandler) HandleTextMessage(message whatsapp.TextMessage) {
 	if message.Info.FromMe == false {
-	
+		
 		responseMessage := msgResponse{TextMessage: message}
 		jsonStr, _ := json.Marshal(responseMessage)
 		urlPost := hlp.Config.GetString("SERVER_API_NODE")
@@ -553,7 +553,7 @@ func WASessionLogin(jid string, timeout int, file string, qrstr chan<- string) e
 		return err
 	}
 
-	wac[jid].AddHandler(&waHandler{wac[jid]})
+	wac[jid].AddHandler(&waHandler{wac[jid], jid})
 
 	return nil
 }
@@ -594,7 +594,7 @@ func WASessionRestore(jid string, timeout int, file string, sess whatsapp.Sessio
 		return err
 	}
 
-	wac[jid].AddHandler(&waHandler{wac[jid]})
+	wac[jid].AddHandler(&waHandler{wac[jid], jid})
 	
 	return nil
 }

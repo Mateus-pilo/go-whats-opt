@@ -3,12 +3,11 @@ module github.com/Mateus-pilo/go-whats-opt
 go 1.13
 
 require (
-	github.com/Rhymen/go-whatsapp v0.1.0
+	github.com/Rhymen/go-whatsapp v0.1.1-0.20200311074336-484cfe758705
 	github.com/coreos/go-semver v0.3.0 // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/go-chi/chi v4.0.3+incompatible
 	github.com/golang/protobuf v1.3.3 // indirect
-	github.com/gorilla/websocket v1.4.1 // indirect
 	github.com/json-iterator/go v1.1.9 // indirect
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/kr/pretty v0.2.0 // indirect
