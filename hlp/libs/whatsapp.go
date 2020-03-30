@@ -30,30 +30,37 @@ var wac = make(map[string]*whatsapp.Conn)
 type waHandler struct{
 	c *whatsapp.Conn
 	jid string
+	created uint64
 }
 
 
 type msgResponse struct {
 	whatsapp.TextMessage
+	jid string
 }
 
 type msgResponseImage struct {
 	whatsapp.ImageMessage
 	Type  string
+	jid string
 }
 
 type msgResponseDocument struct {
 	whatsapp.DocumentMessage
 	Type  string
+	jid string
 }
+
 
 type msgResponseVideo struct {
 	whatsapp.VideoMessage
 	Type string
+	jid string
 }
 type msgResponseAudio struct {
 	whatsapp.AudioMessage
 	Type string
+	jid string
 }
 
 
@@ -76,10 +83,10 @@ func (h *waHandler) HandleError(err error) {
 }
 
 
-func (w *waHandler) HandleTextMessage(message whatsapp.TextMessage) {
-	if message.Info.FromMe == false {
+func (h *waHandler) HandleTextMessage(message whatsapp.TextMessage) {
+	if message.Info.FromMe == false && message.Info.Timestamp >= h.created  {
 		
-		responseMessage := msgResponse{TextMessage: message}
+		responseMessage := msgResponse{TextMessage: message, jid: h.jid}
 		jsonStr, _ := json.Marshal(responseMessage)
 		urlPost := hlp.Config.GetString("SERVER_API_NODE")
 		//fmt.Println(urlPost);
@@ -92,13 +99,13 @@ func (w *waHandler) HandleTextMessage(message whatsapp.TextMessage) {
 	}
 }
 
-func (*waHandler) HandleImageMessage(message whatsapp.ImageMessage) {
+func (h *waHandler) HandleImageMessage(message whatsapp.ImageMessage) {
 	
 	
-	if message.Info.FromMe == false {
+	if message.Info.FromMe == false && message.Info.Timestamp >= h.created {
 		data, err := message.Download()
 		if err != nil {
-			if err != whatsapp.ErrMediaDownloadFailedWith410 && err != whatsapp.ErrMediaDownloadFailedWith410 {
+			if err != whatsapp.ErrMediaDownloadFailedWith410 {
 				return
 			}
 			data, err = message.Download()
@@ -128,7 +135,7 @@ func (*waHandler) HandleImageMessage(message whatsapp.ImageMessage) {
         log.Fatal(err)
 		}
 
-		responseMessage := msgResponseImage{ImageMessage: message, Type: "image"}
+		responseMessage := msgResponseImage{ImageMessage: message, Type: "image", jid: h.jid}
 		
 
 		var inInterface map[string]string
@@ -166,13 +173,13 @@ func (*waHandler) HandleImageMessage(message whatsapp.ImageMessage) {
 	
 }
 
-func (*waHandler) HandleDocumentMessage(message whatsapp.DocumentMessage) {
+func (h *waHandler) HandleDocumentMessage(message whatsapp.DocumentMessage) {
 	
-	if message.Info.FromMe == false {
+	if message.Info.FromMe == false  && message.Info.Timestamp >= h.created {
 	
 		data, err := message.Download()
 		if err != nil {
-			if err != whatsapp.ErrMediaDownloadFailedWith410 && err != whatsapp.ErrMediaDownloadFailedWith410 {
+			if err != whatsapp.ErrMediaDownloadFailedWith410 {
 				return
 			}
 			data, err = message.Download()
@@ -202,7 +209,7 @@ func (*waHandler) HandleDocumentMessage(message whatsapp.DocumentMessage) {
         log.Fatal(err)
 		}
 
-		responseMessage := msgResponseDocument{DocumentMessage: message, Type: "file"}
+		responseMessage := msgResponseDocument{DocumentMessage: message, Type: "file", jid: h.jid}
 		
 
 		var inInterface map[string]string
@@ -238,13 +245,13 @@ func (*waHandler) HandleDocumentMessage(message whatsapp.DocumentMessage) {
 	}
 }
 
-func (*waHandler) HandleVideoMessage(message whatsapp.VideoMessage) {
+func (h *waHandler) HandleVideoMessage(message whatsapp.VideoMessage) {
 	
-	if message.Info.FromMe == false {
+	if message.Info.FromMe == false  && message.Info.Timestamp >= h.created {
 	
 		data, err := message.Download()
 		if err != nil {
-			if err != whatsapp.ErrMediaDownloadFailedWith410 && err != whatsapp.ErrMediaDownloadFailedWith410 {
+			if err != whatsapp.ErrMediaDownloadFailedWith410 {
 				return
 			}
 			data, err = message.Download()
@@ -274,7 +281,7 @@ func (*waHandler) HandleVideoMessage(message whatsapp.VideoMessage) {
         log.Fatal(err)
 		}
 
-		responseMessage := msgResponseVideo{VideoMessage: message, Type: "video"}
+		responseMessage := msgResponseVideo{VideoMessage: message, Type: "video", jid: h.jid}
 		
 
 		var inInterface map[string]string
@@ -310,13 +317,13 @@ func (*waHandler) HandleVideoMessage(message whatsapp.VideoMessage) {
 	}
 }
 
-func (*waHandler) HandleAudioMessage(message whatsapp.AudioMessage){	
+func (h *waHandler) HandleAudioMessage(message whatsapp.AudioMessage){	
 	
-	if message.Info.FromMe == false {
+	if message.Info.FromMe == false  && message.Info.Timestamp >= h.created {
 	
 		data, err := message.Download()
 		if err != nil {
-			if err != whatsapp.ErrMediaDownloadFailedWith410 && err != whatsapp.ErrMediaDownloadFailedWith410 {
+			if err != whatsapp.ErrMediaDownloadFailedWith410 {
 				return
 			}
 			data, err = message.Download()
@@ -346,7 +353,7 @@ func (*waHandler) HandleAudioMessage(message whatsapp.AudioMessage){
         log.Fatal(err)
 		}
 
-		responseMessage := msgResponseAudio{AudioMessage: message, Type: "audio"}
+		responseMessage := msgResponseAudio{AudioMessage: message, Type: "audio", jid: h.jid}
 		
 
 		var inInterface map[string]string
@@ -382,12 +389,7 @@ func (*waHandler) HandleAudioMessage(message whatsapp.AudioMessage){
 
 
 func WASyncVersion(conn *whatsapp.Conn) (string, error) {
-	versionServer, err := whatsapp.CheckCurrentServerVersion()
-	if err != nil {
-		return "", err
-	}
-
-	conn.SetClientVersion(versionServer[0], versionServer[1], versionServer[2])
+	conn.SetClientVersion(0, 4,  3324)
 	versionClient := conn.GetClientVersion()
 	
 	return fmt.Sprintf("whatsapp version %v.%v.%v", versionClient[0], versionClient[1], versionClient[2]), nil
@@ -420,7 +422,8 @@ func WASessionInit(jid string, timeout int) error {
 		if err != nil {
 			return err
 		}
-		conn.SetClientName("Go WhatsApp REST", "Go WhatsApp")
+		conn.SetClientVersion(0, 4,  3324)
+		conn.SetClientName("Hiper Chat", "Go Whats")
 
 		info, err := WASyncVersion(conn)
 		if err != nil {
@@ -553,7 +556,7 @@ func WASessionLogin(jid string, timeout int, file string, qrstr chan<- string) e
 		return err
 	}
 
-	wac[jid].AddHandler(&waHandler{wac[jid], jid})
+	wac[jid].AddHandler(&waHandler{wac[jid], jid, uint64(time.Now().Unix())})
 
 	return nil
 }
@@ -594,7 +597,7 @@ func WASessionRestore(jid string, timeout int, file string, sess whatsapp.Sessio
 		return err
 	}
 
-	wac[jid].AddHandler(&waHandler{wac[jid], jid})
+	wac[jid].AddHandler(&waHandler{wac[jid], jid, uint64(time.Now().Unix())})
 	
 	return nil
 }
