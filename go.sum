@@ -7,6 +7,8 @@ github.com/Rhymen/go-whatsapp v0.1.0 h1:XTXhFIQ/fx9jKObUnUX2Q+nh58EyeHNhX7DniE8x
 github.com/Rhymen/go-whatsapp v0.1.0/go.mod h1:xJSy+okeRjKkQEH/lEYrnekXB3PG33fqL0I6ncAkV50=
 github.com/Rhymen/go-whatsapp v0.1.1-0.20200330124403-6f3b367bb101 h1:ZpYoAZYLL4Ww7BcXTY9hUr7vb6xgmHWhbscBWPiUevw=
 github.com/Rhymen/go-whatsapp v0.1.1-0.20200330124403-6f3b367bb101/go.mod h1:o7jjkvKnigfu432dMbQ/w4PH0Yp5u4Y6ysCNjUlcYCk=
+github.com/Rhymen/go-whatsapp v0.1.1-0.20200408093540-2f227c53b44f h1:uclEol7RbpElhXXmwu38PDeGcgMXNU2vh5DWwzlg7xI=
+github.com/Rhymen/go-whatsapp v0.1.1-0.20200408093540-2f227c53b44f/go.mod h1:o7jjkvKnigfu432dMbQ/w4PH0Yp5u4Y6ysCNjUlcYCk=
 github.com/Rhymen/go-whatsapp/examples/echo v0.0.0-20190325075644-cc2581bbf24d/go.mod h1:zgCiQtBtZ4P4gFWvwl9aashsdwOcbb/EHOGRmSzM8ME=
 github.com/Rhymen/go-whatsapp/examples/restoreSession v0.0.0-20190325075644-cc2581bbf24d/go.mod h1:5sCUSpG616ZoSJhlt9iBNI/KXBqrVLcNUJqg7J9+8pU=
 github.com/Rhymen/go-whatsapp/examples/sendImage v0.0.0-20190325075644-cc2581bbf24d/go.mod h1:RdiyhanVEGXTam+mZ3k6Y3VDCCvXYCwReOoxGozqhHw=

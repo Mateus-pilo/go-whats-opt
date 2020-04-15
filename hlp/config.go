@@ -88,6 +88,7 @@ func configLoadValues() {
 
 	//server API controller
 	Config.SetDefault("SERVER_API_NODE", "http://localhost:5001/api/msg/receive")
+	Config.SetDefault("SERVER_API_NODE_CONTACTS", "http://localhost:5001/api/sync-contact")
 	
 	// Server Upload Limit Value
 	Config.SetDefault("SERVER_UPLOAD_LIMIT", 8)

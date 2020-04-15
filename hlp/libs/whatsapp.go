@@ -15,11 +15,10 @@ import (
 	"path/filepath"
 	"bytes"
 
-
+	
 	
 	whatsapp "github.com/Rhymen/go-whatsapp"
 	qrcode "github.com/skip2/go-qrcode"
-
 	"github.com/Mateus-pilo/go-whats-opt/hlp"
 )
 
@@ -36,31 +35,36 @@ type waHandler struct{
 
 type msgResponse struct {
 	whatsapp.TextMessage
-	jid string
+	Jid string `json:"jid"`
 }
 
 type msgResponseImage struct {
 	whatsapp.ImageMessage
 	Type  string
-	jid string
+	Jid string `json:"jid"`
 }
 
 type msgResponseDocument struct {
 	whatsapp.DocumentMessage
 	Type  string
-	jid string
+	Jid string `json:"jid"`
 }
 
 
 type msgResponseVideo struct {
 	whatsapp.VideoMessage
 	Type string
-	jid string
+	Jid string `json:"jid"`
 }
 type msgResponseAudio struct {
 	whatsapp.AudioMessage
 	Type string
-	jid string
+	Jid string `json:"jid"`
+}
+
+type responseContacts struct {
+	Contacts []whatsapp.Contact `json:"contacts"`
+	Jid string `json:"jid_company"`
 }
 
 
@@ -86,7 +90,9 @@ func (h *waHandler) HandleError(err error) {
 func (h *waHandler) HandleTextMessage(message whatsapp.TextMessage) {
 	if message.Info.FromMe == false && message.Info.Timestamp >= h.created  {
 		
-		responseMessage := msgResponse{TextMessage: message, jid: h.jid}
+		responseMessage := msgResponse{TextMessage: message}
+		responseMessage.Jid = h.jid
+		
 		jsonStr, _ := json.Marshal(responseMessage)
 		urlPost := hlp.Config.GetString("SERVER_API_NODE")
 		//fmt.Println(urlPost);
@@ -135,7 +141,7 @@ func (h *waHandler) HandleImageMessage(message whatsapp.ImageMessage) {
         log.Fatal(err)
 		}
 
-		responseMessage := msgResponseImage{ImageMessage: message, Type: "image", jid: h.jid}
+		responseMessage := msgResponseImage{ImageMessage: message, Type: "image", Jid: h.jid}
 		
 
 		var inInterface map[string]string
@@ -209,7 +215,7 @@ func (h *waHandler) HandleDocumentMessage(message whatsapp.DocumentMessage) {
         log.Fatal(err)
 		}
 
-		responseMessage := msgResponseDocument{DocumentMessage: message, Type: "file", jid: h.jid}
+		responseMessage := msgResponseDocument{DocumentMessage: message, Type: "file", Jid: h.jid}
 		
 
 		var inInterface map[string]string
@@ -281,7 +287,7 @@ func (h *waHandler) HandleVideoMessage(message whatsapp.VideoMessage) {
         log.Fatal(err)
 		}
 
-		responseMessage := msgResponseVideo{VideoMessage: message, Type: "video", jid: h.jid}
+		responseMessage := msgResponseVideo{VideoMessage: message, Type: "video", Jid: h.jid}
 		
 
 		var inInterface map[string]string
@@ -353,7 +359,7 @@ func (h *waHandler) HandleAudioMessage(message whatsapp.AudioMessage){
         log.Fatal(err)
 		}
 
-		responseMessage := msgResponseAudio{AudioMessage: message, Type: "audio", jid: h.jid}
+		responseMessage := msgResponseAudio{AudioMessage: message, Type: "audio", Jid: h.jid}
 		
 
 		var inInterface map[string]string
@@ -388,8 +394,27 @@ func (h *waHandler) HandleAudioMessage(message whatsapp.AudioMessage){
 }
 
 
+func (h *waHandler) HandleContactList(Contacts[] whatsapp.Contact){
+	responseContact := responseContacts{Contacts: Contacts}
+	responseContact.Jid = h.jid
+	
+	jsonStr, _ := json.Marshal(responseContact)
+	urlPost := hlp.Config.GetString("SERVER_API_NODE_CONTACTS")
+	req, _ := http.NewRequest("POST", urlPost, bytes.NewBuffer(jsonStr))
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{}
+	resp, _ := client.Do(req)
+	defer resp.Body.Close()	
+}
+
+func (h *waHandler) HandleChatList(contacts[] whatsapp.Chat){
+	
+	//fmt.Println(contacts);
+}
+
+
 func WASyncVersion(conn *whatsapp.Conn) (string, error) {
-	conn.SetClientVersion(0, 4,  3324)
+	conn.SetClientVersion(0, 4,  2081)
 	versionClient := conn.GetClientVersion()
 	
 	return fmt.Sprintf("whatsapp version %v.%v.%v", versionClient[0], versionClient[1], versionClient[2]), nil
@@ -422,7 +447,7 @@ func WASessionInit(jid string, timeout int) error {
 		if err != nil {
 			return err
 		}
-		conn.SetClientVersion(0, 4,  3324)
+		conn.SetClientVersion(0, 4,  2081)
 		conn.SetClientName("Hiper Chat", "Go Whats")
 
 		info, err := WASyncVersion(conn)
