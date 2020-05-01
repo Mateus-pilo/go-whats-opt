@@ -448,7 +448,7 @@ func WASessionInit(jid string, timeout int) error {
 			return err
 		}
 		conn.SetClientVersion(0, 4,  2081)
-		conn.SetClientName("Hiper Chat", "Go Whats")
+		conn.SetClientName("Hiperchat","Chrome","10.15.4")
 
 		info, err := WASyncVersion(conn)
 		if err != nil {
