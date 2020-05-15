@@ -77,11 +77,27 @@ func (h *waHandler) HandleError(err error) {
 		log.Println("Waiting 30sec...")
 		<-time.After(30 * time.Second)
 		log.Println("Reconnecting...")
-		err := h.c.Restore()
+
+		file := hlp.Config.GetString("SERVER_STORE_PATH") + "/" + h.jid + ".gob"
+		session, err := WASessionLoad(file)
+
+		if err == nil {
+			err = WASessionRestore( h.jid, 5, file, session)
+		} else {
+			// TODO: colocar url pra avisar falha na conexão
+		}
+
+		err = WATestPing(wac[h.jid])
 		if err != nil {
-			log.Fatalf("Restore failed: %v", err)
+			return
+		}
+
+		if err != nil {
+			log.Fatalf("Restore failed: %v", err)	
+			// TODO: colocar url pra avisar falha na conexão
 		}
 	} else {
+		// TODO: colocar url pra avisar falha na conexão
 		log.Printf("error occoured: %v\n", err)
 	}
 }
@@ -541,7 +557,7 @@ func WASessionConnect(jid string, timeout int, file string, qrstr chan<- string,
 		return
 	}
 
-	errmsg <- errors.New("")
+	errmsg<- errors.New("")
 	return
 }
 
@@ -553,11 +569,11 @@ func WASessionLogin(jid string, timeout int, file string, qrstr chan<- string) e
 				return err
 			}
 		}
-
 		delete(wac, jid)
 	}
 
 	err := WASessionInit(jid, timeout)
+	
 	if err != nil {
 		return err
 	}
