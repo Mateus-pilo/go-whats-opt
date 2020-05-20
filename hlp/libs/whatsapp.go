@@ -73,24 +73,20 @@ type responseContacts struct {
 func (h *waHandler) HandleError(err error) {
 
 	if e, ok := err.(*whatsapp.ErrConnectionFailed); ok {
-		log.Printf("Connection failed, underlying error: %v", e.Err)
+		log.Printf("Connection failed, underlying error: [JID: "+h.jid+" ] %v", e.Err)
 		log.Println("Waiting 30sec...")
-		<-time.After(30 * time.Second)
+		<-time.After(10 * time.Second)
 		log.Println("Reconnecting...")
 
+		
 		file := hlp.Config.GetString("SERVER_STORE_PATH") + "/" + h.jid + ".gob"
-		session, err := WASessionLoad(file)
 
-		if err == nil {
-			err = WASessionRestore( h.jid, 5, file, session)
-		} else {
-			// TODO: colocar url pra avisar falha na conexão
-		}
+		qrstr := make(chan string)
+		errmsg := make(chan error)
 
-		err = WATestPing(wac[h.jid])
-		if err != nil {
-			return
-		}
+		go func() {
+			WASessionConnect(h.jid, 1, file, qrstr, errmsg)
+		}()
 
 		if err != nil {
 			log.Fatalf("Restore failed: %v", err)	
@@ -98,7 +94,7 @@ func (h *waHandler) HandleError(err error) {
 		}
 	} else {
 		// TODO: colocar url pra avisar falha na conexão
-		log.Printf("error occoured: %v\n", err)
+		log.Printf("error occoured: [Jid:"+h.jid+"] %v\n", err)
 	}
 }
 
