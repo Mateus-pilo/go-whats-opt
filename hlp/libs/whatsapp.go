@@ -74,7 +74,7 @@ func (h *waHandler) HandleError(err error) {
 
 	if e, ok := err.(*whatsapp.ErrConnectionFailed); ok {
 		log.Printf("Connection failed, underlying error: [JID: "+h.jid+" ] %v", e.Err)
-		log.Println("Waiting 30sec...")
+		log.Println("Waiting 10sec...")
 		<-time.After(10 * time.Second)
 		log.Println("Reconnecting...")
 
@@ -87,14 +87,13 @@ func (h *waHandler) HandleError(err error) {
 		go func() {
 			WASessionConnect(h.jid, 1, file, qrstr, errmsg)
 		}()
-
-		if err != nil {
-			log.Fatalf("Restore failed: %v", err)	
-			// TODO: colocar url pra avisar falha na conexão
-		}
-	} else {
-		// TODO: colocar url pra avisar falha na conexão
-		log.Printf("error occoured: [Jid:"+h.jid+"] %v\n", err)
+		select {
+			case err := <-errmsg:
+				if len(err.Error()) != 0 {
+					log.Println("Reconnect Failed: [Jid: "+h.jid+"]")
+					return
+				}	
+		}	
 	}
 }
 
@@ -618,11 +617,11 @@ func WASessionRestore(jid string, timeout int, file string, sess whatsapp.Sessio
 	session, err := wac[jid].RestoreWithSession(sess)
 	if err != nil {
 		switch strings.ToLower(err.Error()) {
-		case "already logged in":
+		case "already logged in [Jid: "+jid+"]":
 			return nil
-		case "could not send proto: failed to write message: error writing to websocket: websocket: close sent":
+		case "could not send proto: failed to write message: error writing to websocket: websocket: close sent [Jid: "+jid+"]":
 			delete(wac, jid)
-			return errors.New("connection is invalid")
+			return errors.New("connection is invalid [Jid: "+jid+"]")
 		default:
 			delete(wac, jid)
 			return err
@@ -655,7 +654,7 @@ func WASessionLogout(jid string, file string) error {
 
 		delete(wac, jid)
 	} else {
-		return errors.New("connection is invalid")
+		return errors.New("connection is invalid [Jid: "+jid+"]")
 	}
 
 	return nil
@@ -680,17 +679,17 @@ func WAMessageText(jid string, jidDest string, msgText string, msgQuotedID strin
 		id, err := wac[jid].Send(content)
 		if err != nil {
 			switch strings.ToLower(err.Error()) {
-			case "sending message timed out":
+			case "sending message timed out: [Jid: "+jid+"]":
 				return id, nil
-			case "could not send proto: failed to write message: error writing to websocket: websocket: close sent":
+			case "could not send proto: failed to write message: error writing to websocket: websocket: close sent [Jid: "+jid+"]":
 				delete(wac, jid)
-				return "", errors.New("connection is invalid")
+				return "", errors.New("connection is invalid [Jid: "+jid+"]")
 			default:
 				return "", err
 			}
 		}
 	} else {
-		return "", errors.New("connection is invalid")
+		return "", errors.New("connection is invalid [Jid: "+jid+"]")
 	}
 
 	return id, nil
@@ -719,17 +718,17 @@ func WAMessageImage(jid string, jidDest string, msgImageStream multipart.File, m
 		id, err := wac[jid].Send(content)
 		if err != nil {
 			switch strings.ToLower(err.Error()) {
-			case "sending message timed out":
+			case "sending message timed out [Jid: "+jid+"]":
 				return id, nil
-			case "could not send proto: failed to write message: error writing to websocket: websocket: close sent":
+			case "could not send proto: failed to write message: error writing to websocket: websocket: close sent [Jid: "+jid+"]":
 				delete(wac, jid)
-				return "", errors.New("connection is invalid")
+				return "", errors.New("connection is invalid [Jid: "+jid+"]")
 			default:
 				return "", err
 			}
 		}
 	} else {
-		return "", errors.New("connection is invalid")
+		return "", errors.New("connection is invalid [Jid: "+jid+"]")
 	}
 	return id, nil
 }
