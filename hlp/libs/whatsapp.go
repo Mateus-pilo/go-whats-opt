@@ -368,7 +368,6 @@ func WATestPing(conn *whatsapp.Conn) error {
 		if err != nil {
 			return err
 		} else {
-			notifyError(h.jid)
 			return errors.New("something when wrong while trying to ping, please check phone connectivity")
 		}
 	}
@@ -561,7 +560,7 @@ func WASessionRestore(jid string, timeout int, file string, sess whatsapp.Sessio
 			delete(wac, jid)
 			return errors.New("connection is invalid [Jid: "+jid+"]")
 		default:
-			notifyError(h.jid)
+			notifyError(jid)
 			delete(wac, jid)
 			return err
 		}
@@ -663,7 +662,7 @@ func WAMessageImage(jid string, jidDest string, msgImageStream multipart.File, m
 		if err != nil {
 			switch strings.ToLower(err.Error()) {
 			case "sending message timed out [Jid: "+jid+"]":
-				notifyError(h.jid)
+				notifyError(jid)
 				return id, nil
 			case "could not send proto: failed to write message: error writing to websocket: websocket: close sent [Jid: "+jid+"]":
 				delete(wac, jid)
@@ -705,7 +704,7 @@ func WAMessageDocument(jid string, jidDest string, msgDocumentStream multipart.F
 		if err != nil {
 			switch strings.ToLower(err.Error()) {
 			case "sending message timed out":
-				notifyError(h.jid)
+				notifyError(jid)
 				return id, nil
 			case "could not send proto: failed to write message: error writing to websocket: websocket: close sent":
 				notifyError(jid)
