@@ -90,7 +90,7 @@ func configLoadValues() {
 	Config.SetDefault("SERVER_API_NODE", "http://localhost:5001/api/msg/receive")
 	Config.SetDefault("SERVER_API_NODE_CONTACTS", "http://localhost:5001/api/sync-contact")
 	Config.SetDefault("SERVER_API_NODE_ERROR", "http://localhost:5001/api/errors/disconnected")
-	Config.SetDefault("AMQP_URL", "amqp://guest:Optjuntos123$@localhost:5672")
+	Config.SetDefault("AMQP_URL", "amqp://golang:Optjuntos123$@localhost:5672")
 	
 	// Server Upload Limit Value
 	Config.SetDefault("SERVER_UPLOAD_LIMIT", 8)
