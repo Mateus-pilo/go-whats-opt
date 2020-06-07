@@ -6,8 +6,11 @@ import (
 	"os/signal"
 	"syscall"
 
+
 	"github.com/Mateus-pilo/go-whats-opt/hlp"
+	"github.com/Mateus-pilo/go-whats-opt/hlp/libs"
 	"github.com/Mateus-pilo/go-whats-opt/hlp/router"
+	
 )
 
 // Server Variable
@@ -22,6 +25,7 @@ func init() {
 // Main Function
 func main() {
 	// Starting Server
+	_ = libs.ConnectionMqp();
 	svr.Start()
 
 	// Make Channel for OS Signal

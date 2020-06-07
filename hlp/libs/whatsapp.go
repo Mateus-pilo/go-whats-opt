@@ -15,14 +15,15 @@ import (
 	"path/filepath"
 	"bytes"
 
-	
-	
+	"github.com/streadway/amqp"
+
 	whatsapp "github.com/Rhymen/go-whatsapp"
 	qrcode "github.com/skip2/go-qrcode"
 	"github.com/Mateus-pilo/go-whats-opt/hlp"
 )
 
 var wac = make(map[string]*whatsapp.Conn)
+var amq = ConnectionMqp()
 
 
 
@@ -42,12 +43,16 @@ type msgResponseImage struct {
 	whatsapp.ImageMessage
 	Type  string
 	Jid string `json:"jid"`
+	Path string `json:"file"`
+	File_name string `json:"file_name"`
 }
 
 type msgResponseDocument struct {
 	whatsapp.DocumentMessage
 	Type  string
 	Jid string `json:"jid"`
+	Path string `json:"file"`
+	File_name string `json:"file_name"`
 }
 
 
@@ -55,11 +60,15 @@ type msgResponseVideo struct {
 	whatsapp.VideoMessage
 	Type string
 	Jid string `json:"jid"`
+	Path string `json:"file"`
+	File_name string `json:"file_name"`
 }
 type msgResponseAudio struct {
 	whatsapp.AudioMessage
 	Type string
 	Jid string `json:"jid"`
+	Path string `json:"file"`
+	File_name string `json:"file_name"`
 }
 
 type responseContacts struct {
@@ -67,6 +76,9 @@ type responseContacts struct {
 	Jid string `json:"jid_company"`
 }
 
+type errorDisconnected struct {
+	Jid string `json:"jid_company"`
+}
 
 
 
@@ -74,8 +86,9 @@ func (h *waHandler) HandleError(err error) {
 
 	if e, ok := err.(*whatsapp.ErrConnectionFailed); ok {
 		log.Printf("Connection failed, underlying error: [JID: "+h.jid+" ] %v", e.Err)
-		log.Println("Waiting 10sec...")
-		<-time.After(10 * time.Second)
+		log.Println("Waiting 30sec...")
+		notifyError(h.jid)
+		<-time.After(30 * time.Second)
 		log.Println("Reconnecting...")
 
 		
@@ -85,7 +98,7 @@ func (h *waHandler) HandleError(err error) {
 		errmsg := make(chan error)
 
 		go func() {
-			WASessionConnect(h.jid, 1, file, qrstr, errmsg)
+			WASessionConnect(h.jid, 5, file, qrstr, errmsg)
 		}()
 		select {
 			case err := <-errmsg:
@@ -103,20 +116,25 @@ func (h *waHandler) HandleTextMessage(message whatsapp.TextMessage) {
 		
 		responseMessage := msgResponse{TextMessage: message}
 		responseMessage.Jid = h.jid
-		
 		jsonStr, _ := json.Marshal(responseMessage)
-		urlPost := hlp.Config.GetString("SERVER_API_NODE")
-		//fmt.Println(urlPost);
-		req, _ := http.NewRequest("POST", urlPost, bytes.NewBuffer(jsonStr))
-		req.Header.Set("Content-Type", "application/json")
-
-		client := &http.Client{}
-		resp, _ := client.Do(req)
-		defer resp.Body.Close()
+		
+		err := amq.Channel.Publish(
+			"",     // exchange
+			"msgSend", // routing key
+			false,  // mandatory
+			false,  // immediate
+			amqp.Publishing {
+				ContentType: "text/plain",
+				Body:        []byte(jsonStr),
+			})
+		
+		if err != nil {
+			log.Println("Fail Publish Msg [Jid: "+h.jid+"]")
+		}
 	}
 }
 
-func (h *waHandler) HandleImageMessage(message whatsapp.ImageMessage) {
+func (h *waHandler) HandleImageMessage(message whatsapp.ImageMessage) { 
 	
 	
 	if message.Info.FromMe == false && message.Info.Timestamp >= h.created {
@@ -141,50 +159,28 @@ func (h *waHandler) HandleImageMessage(message whatsapp.ImageMessage) {
 			return
 		}
 
-		
-		body := new(bytes.Buffer)
-
-		writer := multipart.NewWriter(body)
-
-		_, err = writer.CreateFormFile("file", filepath.Base(filename))
-
-    if err != nil {
-        log.Fatal(err)
-		}
-
-		responseMessage := msgResponseImage{ImageMessage: message, Type: "image", Jid: h.jid}
+		responseMessage := msgResponseImage{ImageMessage: message, Type: "image", Jid: h.jid, Path: filename, File_name: filepath.Base(filename) }
 		
 
 		var inInterface map[string]string
 		jsonStr, _ := json.Marshal(responseMessage)
 		json.Unmarshal(jsonStr, &inInterface)
 		
-    // iterate through inrecs
-    for field, val := range inInterface {
-			if field != "Info" {
-				_ = writer.WriteField(field, val)
-			}
+
+		err = amq.Channel.Publish(
+			"",     // exchange
+			"msgSend", // routing key
+			false,  // mandatory
+			false,  // immediate
+			amqp.Publishing {
+				DeliveryMode: amqp.Persistent,
+				ContentType: "text/plain",
+				Body: []byte(jsonStr),
+			})
+		
+		if err != nil {
+			log.Println("Fail Publish Msg [Jid: "+h.jid+"]")
 		}
-		
-		var inInterfaceInfo map[string]string
-		jsonStr, _ = json.Marshal(message.Info)
-    json.Unmarshal(jsonStr, &inInterfaceInfo)
-
-		for field, val := range inInterfaceInfo {
-			_ = writer.WriteField(field, val)
-		}
-		
-
-		writer.Close()
-		
-
-		urlPost := hlp.Config.GetString("SERVER_API_NODE")
-		req, _ := http.NewRequest("POST", urlPost, body)
-		req.Header.Set("Content-Type", writer.FormDataContentType())
-
-		client := &http.Client{}
-		resp, _ := client.Do(req)
-		defer resp.Body.Close()
 
 	}
 	
@@ -214,51 +210,29 @@ func (h *waHandler) HandleDocumentMessage(message whatsapp.DocumentMessage) {
 			fmt.Printf("[!] %v\n", err)
 			return
 		}
-
-		
-		body := new(bytes.Buffer)
-
-		writer := multipart.NewWriter(body)
-
-		_, err = writer.CreateFormFile("file", filepath.Base(filename))
-
-    if err != nil {
-        log.Fatal(err)
-		}
-
-		responseMessage := msgResponseDocument{DocumentMessage: message, Type: "file", Jid: h.jid}
+	
+		responseMessage := msgResponseDocument{DocumentMessage: message, Type: "file", Jid: h.jid, Path:	filename, File_name: filepath.Base(filename) }
 		
 
 		var inInterface map[string]string
 		jsonStr, _ := json.Marshal(responseMessage)
 		json.Unmarshal(jsonStr, &inInterface)
 		
-    // iterate through inrecs
-    for field, val := range inInterface {
-			if field != "Info" {
-				_ = writer.WriteField(field, val)
-			}
+  
+		err = amq.Channel.Publish(
+			"",     // exchange
+			"msgSend", // routing key
+			false,  // mandatory
+			false,  // immediate
+			amqp.Publishing {
+				DeliveryMode: amqp.Persistent,
+				ContentType: "text/plain",
+				Body: []byte(jsonStr),
+			})
+		
+		if err != nil {
+			log.Println("Fail Publish Msg [Jid: "+h.jid+"]")
 		}
-		
-		var inInterfaceInfo map[string]string
-		jsonStr, _ = json.Marshal(message.Info)
-    json.Unmarshal(jsonStr, &inInterfaceInfo)
-
-    // iterate through inrecs
-    for field, val := range inInterfaceInfo {
-			_ = writer.WriteField(field, val)
-		}
-		
-		writer.Close()
-		
-
-		urlPost := hlp.Config.GetString("SERVER_API_NODE")
-		req, _ := http.NewRequest("POST", urlPost, body)
-		req.Header.Set("Content-Type", writer.FormDataContentType())
-
-		client := &http.Client{}
-		resp, _ := client.Do(req)
-		defer resp.Body.Close()
 	}
 }
 
@@ -287,50 +261,27 @@ func (h *waHandler) HandleVideoMessage(message whatsapp.VideoMessage) {
 			return
 		}
 
-		
-		body := new(bytes.Buffer)
-
-		writer := multipart.NewWriter(body)
-
-		_, err = writer.CreateFormFile("file", filepath.Base(filename))
-
-    if err != nil {
-        log.Fatal(err)
-		}
-
-		responseMessage := msgResponseVideo{VideoMessage: message, Type: "video", Jid: h.jid}
+		responseMessage := msgResponseVideo{VideoMessage: message, Type: "video", Jid: h.jid, Path: filename, File_name:filepath.Base(filename) }
 		
 
 		var inInterface map[string]string
 		jsonStr, _ := json.Marshal(responseMessage)
 		json.Unmarshal(jsonStr, &inInterface)
 		
-    // iterate through inrecs
-    for field, val := range inInterface {
-			if field != "Info" {
-				_ = writer.WriteField(field, val)
-			}
-		}
+		err = amq.Channel.Publish(
+			"",     // exchange
+			"msgSend", // routing key
+			false,  // mandatory
+			false,  // immediate
+			amqp.Publishing {
+				DeliveryMode: amqp.Persistent,
+				ContentType: "text/plain",
+				Body: []byte(jsonStr),
+			})
 		
-		var inInterfaceInfo map[string]string
-		jsonStr, _ = json.Marshal(message.Info)
-    json.Unmarshal(jsonStr, &inInterfaceInfo)
-
-    // iterate through inrecs
-    for field, val := range inInterfaceInfo {
-			_ = writer.WriteField(field, val)
+		if err != nil {
+			log.Println("Fail Publish Msg [Jid: "+h.jid+"]")
 		}
-
-		writer.Close()
-		
-
-		urlPost := hlp.Config.GetString("SERVER_API_NODE")
-		req, _ := http.NewRequest("POST", urlPost, body)
-		req.Header.Set("Content-Type", writer.FormDataContentType())
-
-		client := &http.Client{}
-		resp, _ := client.Do(req)
-		defer resp.Body.Close()
 	}
 }
 
@@ -359,48 +310,28 @@ func (h *waHandler) HandleAudioMessage(message whatsapp.AudioMessage){
 			return
 		}
 
-		
-		body := new(bytes.Buffer)
-
-		writer := multipart.NewWriter(body)
-
-		_, err = writer.CreateFormFile("file", filepath.Base(filename))
-
-    if err != nil {
-        log.Fatal(err)
-		}
-
-		responseMessage := msgResponseAudio{AudioMessage: message, Type: "audio", Jid: h.jid}
+		responseMessage := msgResponseAudio{AudioMessage: message, Type: "audio", Jid: h.jid, Path:filename, File_name:  filepath.Base(filename)}
 		
 
 		var inInterface map[string]string
 		jsonStr, _ := json.Marshal(responseMessage)
 		json.Unmarshal(jsonStr, &inInterface)
+
+		err = amq.Channel.Publish(
+			"",     // exchange
+			"msgSend", // routing key
+			false,  // mandatory
+			false,  // immediate
+			amqp.Publishing {
+				DeliveryMode: amqp.Persistent,
+				ContentType: "text/plain",
+				Body: []byte(jsonStr),
+			})
 		
-    // iterate through inrecs
-    for field, val := range inInterface {
-			if field != "Info" {
-				_ = writer.WriteField(field, val)
-			}
+		if err != nil {
+			log.Println("Fail Publish Msg [Jid: "+h.jid+"]")
 		}
-		
-		var inInterfaceInfo map[string]string
-		jsonStr, _ = json.Marshal(message.Info)
-    json.Unmarshal(jsonStr, &inInterfaceInfo)
 
-    // iterate through inrecs
-    for field, val := range inInterfaceInfo {
-			_ = writer.WriteField(field, val)
-		}
-		writer.Close()
-
-		urlPost := hlp.Config.GetString("SERVER_API_NODE")
-		req, _ := http.NewRequest("POST", urlPost, body)
-		req.Header.Set("Content-Type", writer.FormDataContentType())
-
-		client := &http.Client{}
-		resp, _ := client.Do(req)
-		defer resp.Body.Close()
 	}
 }
 
@@ -437,6 +368,7 @@ func WATestPing(conn *whatsapp.Conn) error {
 		if err != nil {
 			return err
 		} else {
+			notifyError(h.jid)
 			return errors.New("something when wrong while trying to ping, please check phone connectivity")
 		}
 	}
@@ -493,17 +425,16 @@ func WASessionLoad(file string) (whatsapp.Session, error) {
 }
 
 func WASessionSave(file string, session whatsapp.Session) error {
-	buffer, err := os.Create(file)
+	arq, err := os.Create(file)
 	if err != nil {
 		return err
 	}
-	defer buffer.Close()
-
-	err = gob.NewEncoder(buffer).Encode(session)
+	defer arq.Close()
+	encoder := gob.NewEncoder(arq)
+	err = encoder.Encode(session)
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -557,13 +488,15 @@ func WASessionConnect(jid string, timeout int, file string, qrstr chan<- string,
 }
 
 func WASessionLogin(jid string, timeout int, file string, qrstr chan<- string) error {
+	
 	if wac[jid] != nil {
-		if WASessionExist(file) {
+			/*if WASessionExist(file) {
 			err := os.Remove(file)
 			if err != nil {
 				return err
 			}
 		}
+		*/
 		delete(wac, jid)
 	}
 
@@ -579,9 +512,11 @@ func WASessionLogin(jid string, timeout int, file string, qrstr chan<- string) e
 		case "already logged in":
 			return nil
 		case "could not send proto: failed to write message: error writing to websocket: websocket: close sent":
+			notifyError(jid)
 			delete(wac, jid)
 			return errors.New("connection is invalid")
 		default:
+			notifyError(jid)
 			delete(wac, jid)
 			return err
 		}
@@ -598,13 +533,15 @@ func WASessionLogin(jid string, timeout int, file string, qrstr chan<- string) e
 }
 
 func WASessionRestore(jid string, timeout int, file string, sess whatsapp.Session) error {
+	
 	if wac[jid] != nil {
-		if WASessionExist(file) {
+	
+	/*	if WASessionExist(file) {
 			err := os.Remove(file)
 			if err != nil {
 				return err
 			}
-		}
+		}*/
 
 		delete(wac, jid)
 	}
@@ -620,9 +557,11 @@ func WASessionRestore(jid string, timeout int, file string, sess whatsapp.Sessio
 		case "already logged in [Jid: "+jid+"]":
 			return nil
 		case "could not send proto: failed to write message: error writing to websocket: websocket: close sent [Jid: "+jid+"]":
+			notifyError(jid)
 			delete(wac, jid)
 			return errors.New("connection is invalid [Jid: "+jid+"]")
 		default:
+			notifyError(h.jid)
 			delete(wac, jid)
 			return err
 		}
@@ -645,6 +584,7 @@ func WASessionLogout(jid string, file string) error {
 			return err
 		}
 
+		
 		if WASessionExist(file) {
 			err = os.Remove(file)
 			if err != nil {
@@ -654,6 +594,7 @@ func WASessionLogout(jid string, file string) error {
 
 		delete(wac, jid)
 	} else {
+		notifyError(jid)
 		return errors.New("connection is invalid [Jid: "+jid+"]")
 	}
 
@@ -680,8 +621,10 @@ func WAMessageText(jid string, jidDest string, msgText string, msgQuotedID strin
 		if err != nil {
 			switch strings.ToLower(err.Error()) {
 			case "sending message timed out: [Jid: "+jid+"]":
+				notifyError(jid)
 				return id, nil
 			case "could not send proto: failed to write message: error writing to websocket: websocket: close sent [Jid: "+jid+"]":
+				notifyError(jid)
 				delete(wac, jid)
 				return "", errors.New("connection is invalid [Jid: "+jid+"]")
 			default:
@@ -689,6 +632,7 @@ func WAMessageText(jid string, jidDest string, msgText string, msgQuotedID strin
 			}
 		}
 	} else {
+		notifyError(jid)
 		return "", errors.New("connection is invalid [Jid: "+jid+"]")
 	}
 
@@ -719,15 +663,18 @@ func WAMessageImage(jid string, jidDest string, msgImageStream multipart.File, m
 		if err != nil {
 			switch strings.ToLower(err.Error()) {
 			case "sending message timed out [Jid: "+jid+"]":
+				notifyError(h.jid)
 				return id, nil
 			case "could not send proto: failed to write message: error writing to websocket: websocket: close sent [Jid: "+jid+"]":
 				delete(wac, jid)
+				notifyError(jid)
 				return "", errors.New("connection is invalid [Jid: "+jid+"]")
 			default:
 				return "", err
 			}
 		}
 	} else {
+		notifyError(jid)
 		return "", errors.New("connection is invalid [Jid: "+jid+"]")
 	}
 	return id, nil
@@ -758,8 +705,10 @@ func WAMessageDocument(jid string, jidDest string, msgDocumentStream multipart.F
 		if err != nil {
 			switch strings.ToLower(err.Error()) {
 			case "sending message timed out":
+				notifyError(h.jid)
 				return id, nil
 			case "could not send proto: failed to write message: error writing to websocket: websocket: close sent":
+				notifyError(jid)
 				delete(wac, jid)
 				return "", errors.New("connection is invalid")
 			default:
@@ -767,8 +716,21 @@ func WAMessageDocument(jid string, jidDest string, msgDocumentStream multipart.F
 			}
 		}
 	} else {
+		notifyError(jid)
 		return "", errors.New("connection is invalid")
 	}
 
 	return id, nil
 }
+
+func notifyError(jid string) {
+	var errorDisconnected = errorDisconnected{jid};
+	jsonStr, _ := json.Marshal(errorDisconnected)
+	urlPost := hlp.Config.GetString("SERVER_API_NODE_ERROR")
+	req, _ := http.NewRequest("POST", urlPost, bytes.NewBuffer(jsonStr))
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{}
+	resp, _ := client.Do(req)
+	defer resp.Body.Close()	
+	}
+
