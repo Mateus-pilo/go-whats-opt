@@ -35,11 +35,9 @@ func ConnectionMqp() (session) {
 	if err != nil {
 		panic("could not establish connection with RabbitMQ:" + err.Error())
 	}
-	defer conn.Close()
 
 	ch, err := conn.Channel()
 	failOnError(err, "Failed to open a channel")
-	defer ch.Close()
 
 
 	if err != nil {
