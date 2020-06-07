@@ -64,14 +64,6 @@ func ConnectionMqp() (session) {
 		panic("error declaring the queue: " + err.Error())
 	}
 
-	// We bind the queue to the exchange to send and receive data from the queue
-	err = ch.QueueBind("msgSend", "#", "events", false, nil)
-	err = ch.QueueBind("msgReceive", "#", "events", false, nil)
-
-	if err != nil {
-		panic("error binding to the queue: " + err.Error())
-	}
-
 	connection = &session{conn,ch}
 	return *connection;
 }
