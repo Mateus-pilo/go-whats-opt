@@ -37,7 +37,6 @@ func ConnectionMqp() (session) {
 	}
 	defer conn.Close()
 
-	channel, err := conn.Channel()
 	ch, err := conn.Channel()
 	failOnError(err, "Failed to open a channel")
 	defer ch.Close()
@@ -47,7 +46,7 @@ func ConnectionMqp() (session) {
 			panic("could not open RabbitMQ channel:" + err.Error())
 	}
 
-	err = channel.ExchangeDeclare("msgSend", "topic", true, false, false, false, nil)
+	err = ch.ExchangeDeclare("msgSend", "topic", true, false, false, false, nil)
 
 	if err != nil {
 			panic(err)
@@ -59,8 +58,8 @@ func ConnectionMqp() (session) {
 	}
 
 	// We create a queue named Test
-	_, err = channel.QueueDeclare("msgSend", true, false, false, false, nil)
-	_, err = channel.QueueDeclare("msgReceive", true, false, false, false, nil)
+	_, err = ch.QueueDeclare("msgSend", true, false, false, false, nil)
+	_, err = ch.QueueDeclare("msgReceive", true, false, false, false, nil)
 
 
 	if err != nil {
@@ -68,14 +67,14 @@ func ConnectionMqp() (session) {
 	}
 
 	// We bind the queue to the exchange to send and receive data from the queue
-	err = channel.QueueBind("msgSend", "#", "events", false, nil)
-	err = channel.QueueBind("msgReceive", "#", "events", false, nil)
+	err = ch.QueueBind("msgSend", "#", "events", false, nil)
+	err = ch.QueueBind("msgReceive", "#", "events", false, nil)
 
 	if err != nil {
 		panic("error binding to the queue: " + err.Error())
 	}
 
-	connection = &session{conn,channel}
+	connection = &session{conn,ch}
 	return *connection;
 }
 
