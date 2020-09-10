@@ -25,7 +25,6 @@ func (s session) Close() error {
 func ConnectionMqp() (session) {
 
 	if connection != nil {
-		log.Println("Caiu")
 		return *connection
 	}
 
